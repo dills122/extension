@@ -152,16 +152,37 @@ export default class InternalEthereumProviderService extends BaseService<Events>
       case "net_version":
       case "web3_clientVersion":
       case "web3_sha3":
-        return this.chainService.send(method, params)
+        return this.chainService.send(method, params).then(
+          (r) => {
+            // console.log(
+            //   "---------------default:",
+            //   method,
+            //   JSON.stringify(params)
+            // )
+            // console.log(">>>> default resp: ", JSON.stringify(r))
+            return Promise.resolve(r)
+          },
+          (r) => {
+            console.log(method, params)
+            // debugger
+            console.error("chainservice error", r)
+            return Promise.reject(r)
+          }
+        )
       case "eth_accounts": {
         // This is a special method, because Alchemy provider DO support it, but always return null (because they do not store keys.)
         const { address } = await this.preferenceService.getSelectedAccount()
         return [address]
       }
       case "eth_sendTransaction":
+        // @ts-expect-error asdf
+        // eslint-disable-next-line no-param-reassign
+        params[0].network.chainID = 1337
+        debugger
         return this.signTransaction(
           params[0] as JsonRpcTransactionRequest
         ).then(async (signed) => {
+          debugger
           await this.chainService.broadcastSignedTransaction(signed)
           return signed.hash
         })

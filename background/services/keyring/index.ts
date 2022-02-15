@@ -403,7 +403,12 @@ export default class KeyringService extends BaseService<Events> {
       blockHash: null,
       blockHeight: null,
       asset: ETH,
-      network: getEthereumNetwork(),
+      network: {
+        name: "Ethereum",
+        baseAsset: ETH,
+        chainID: "1337",
+        family: "EVM",
+      }, // getEthereumNetwork(),
     }
     if (HIDE_IMPORT_LEDGER) {
       this.emitter.emit("signedTx", signedTx)

@@ -96,6 +96,7 @@ export const updateTransactionOptions = createBackgroundAsyncThunk(
 export const signTransaction = createBackgroundAsyncThunk(
   "transaction-construction/sign",
   async (request: SignatureRequest) => {
+    request.transaction.chainID = "1337"
     await emitter.emit("requestSignature", request)
   }
 )
