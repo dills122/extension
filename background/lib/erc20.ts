@@ -8,7 +8,7 @@ import {
   TransactionDescription,
 } from "ethers/lib/utils"
 import { getTokenBalances, getTokenMetadata } from "./alchemy"
-import { getEthereumNetwork } from "./utils"
+import { getEthereumNetwork, normalizeEVMAddress } from "./utils"
 import { AccountBalance } from "../accounts"
 import { SmartContractFungibleAsset } from "../assets"
 import { EVMLog } from "../networks"
@@ -99,8 +99,8 @@ export async function getBalances(
 
   const tokenBalances = await getTokenBalances(
     provider,
-    address,
-    tokens.map((t) => t.contractAddress)
+    normalizeEVMAddress(address),
+    tokens.map((t) => normalizeEVMAddress(t.contractAddress))
   )
 
   const assetByAddress = tokens.reduce<{
@@ -204,7 +204,10 @@ export const getERC20TokenMetadata = async (
   address: string
 ): Promise<SmartContractFungibleAsset | null> => {
   try {
-    const tokenMetadata = await getTokenMetadata(alchemyProvider, address)
+    const tokenMetadata = await getTokenMetadata(
+      alchemyProvider,
+      normalizeEVMAddress(address)
+    )
     return tokenMetadata
   } catch (err) {
     logger.warn("Couldn't find token with specified address", address)

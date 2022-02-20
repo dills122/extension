@@ -1,19 +1,20 @@
-import { BigNumber } from "ethers"
 import {
-  SmartContractFungibleAsset,
   isSmartContractFungibleAsset,
+  SmartContractFungibleAsset,
 } from "../../assets"
-import { AnyEVMTransaction, EIP1559TransactionRequest } from "../../networks"
-import { enrichAssetAmountWithDecimalValues } from "../../redux-slices/utils/asset-utils"
-
 import { ETH } from "../../constants"
 import { parseERC20Tx, parseLogsForERC20Transfers } from "../../lib/erc20"
-import { sameEVMAddress } from "../../lib/utils"
-
+import {
+  normalizeEVMAddress,
+  normalizeEVMAddressList,
+  sameEVMAddress,
+} from "../../lib/utils"
+import { AnyEVMTransaction, EIP1559TransactionRequest } from "../../networks"
+import { enrichAssetAmountWithDecimalValues } from "../../redux-slices/utils/asset-utils"
+import BaseService from "../base"
 import ChainService from "../chain"
 import IndexingService from "../indexing"
 import { ServiceCreatorFunction, ServiceLifecycleEvents } from "../types"
-import BaseService from "../base"
 import {
   EnrichedEVMTransaction,
   EnrichedEVMTransactionSignatureRequest,
@@ -78,7 +79,7 @@ export default class EnrichmentService extends BaseService<Events> {
             transaction,
             2 /* TODO desiredDecimals should be configurable */
           ),
-          forAccounts,
+          forAccounts: normalizeEVMAddressList(forAccounts),
         })
       }
     )
@@ -116,8 +117,8 @@ export default class EnrichmentService extends BaseService<Events> {
         txAnnotation = {
           timestamp: resolvedTime,
           type: "asset-transfer",
-          senderAddress: transaction.from,
-          recipientAddress: transaction.to, // TODO ingest address
+          senderAddress: normalizeEVMAddress(transaction.from),
+          recipientAddress: normalizeEVMAddress(transaction.to), // TODO ingest address
           assetAmount: enrichAssetAmountWithDecimalValues(
             {
               asset: ETH,
@@ -158,8 +159,10 @@ export default class EnrichmentService extends BaseService<Events> {
           timestamp: resolvedTime,
           type: "asset-transfer",
           transactionLogoURL,
-          senderAddress: erc20Tx.args.from ?? transaction.to,
-          recipientAddress: erc20Tx.args.to, // TODO ingest address
+          senderAddress: normalizeEVMAddress(
+            erc20Tx.args.from ?? transaction.to
+          ),
+          recipientAddress: normalizeEVMAddress(erc20Tx.args.to), // TODO ingest address
           assetAmount: enrichAssetAmountWithDecimalValues(
             {
               asset: matchingFungibleAsset,
@@ -177,7 +180,7 @@ export default class EnrichmentService extends BaseService<Events> {
           timestamp: resolvedTime,
           type: "asset-approval",
           transactionLogoURL,
-          spenderAddress: erc20Tx.args.spender, // TODO ingest address
+          spenderAddress: normalizeEVMAddress(erc20Tx.args.spender), // TODO ingest address
           assetAmount: enrichAssetAmountWithDecimalValues(
             {
               asset: matchingFungibleAsset,
