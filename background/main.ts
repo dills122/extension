@@ -29,7 +29,7 @@ import {
 
 import { EIP712TypedData, HexString, KeyringTypes } from "./types"
 import { SignedEVMTransaction } from "./networks"
-import { AddressNetwork, NameNetwork } from "./accounts"
+import { AddressOnNetwork, NameOnNetwork } from "./accounts"
 
 import rootReducer from "./redux-slices"
 import {
@@ -490,11 +490,11 @@ export default class Main extends BaseService<never> {
     )
   }
 
-  async addAccount(addressNetwork: AddressNetwork): Promise<void> {
+  async addAccount(addressNetwork: AddressOnNetwork): Promise<void> {
     await this.chainService.addAccountToTrack(addressNetwork)
   }
 
-  async addAccountByName(nameNetwork: NameNetwork): Promise<void> {
+  async addAccountByName(nameNetwork: NameOnNetwork): Promise<void> {
     try {
       const address = await this.nameService.lookUpEthereumAddress(
         nameNetwork.name
@@ -576,7 +576,7 @@ export default class Main extends BaseService<never> {
 
       const { transactionRequest: populatedRequest, gasEstimationError } =
         await this.chainService.populatePartialEVMTransactionRequest(
-          getEthereumNetwork(),
+          this.chainService.ethereumNetwork,
           {
             ...options,
             maxFeePerGas: options.maxFeePerGas ?? maxFeePerGas,
@@ -585,17 +585,25 @@ export default class Main extends BaseService<never> {
           }
         )
 
+      const { annotation } =
+        await this.enrichmentService.enrichTransactionSignature(
+          this.chainService.ethereumNetwork,
+          populatedRequest,
+          2 /* TODO desiredDecimals should be configurable */
+        )
+      const enrichedPopulatedRequest = { ...populatedRequest, annotation }
+
       if (typeof gasEstimationError === "undefined") {
         this.store.dispatch(
           transactionRequest({
-            transactionRequest: populatedRequest,
+            transactionRequest: enrichedPopulatedRequest,
             transactionLikelyFails: false,
           })
         )
       } else {
         this.store.dispatch(
           transactionRequest({
-            transactionRequest: populatedRequest,
+            transactionRequest: enrichedPopulatedRequest,
             transactionLikelyFails: true,
           })
         )
@@ -618,7 +626,10 @@ export default class Main extends BaseService<never> {
 
           try {
             const signedTx = await this.keyringService.signTransaction(
-              normalizeEVMAddress(transaction.from),
+              {
+                address: normalizeEVMAddress(transaction.from),
+                network: this.chainService.ethereumNetwork,
+              },
               transactionWithNonce
             )
             this.store.dispatch(signed(signedTx))
@@ -632,6 +643,7 @@ export default class Main extends BaseService<never> {
         } else {
           try {
             const signedTx = await this.signingService.signTransaction(
+              this.chainService.ethereumNetwork,
               transaction,
               method
             )
@@ -780,7 +792,7 @@ export default class Main extends BaseService<never> {
       this.chainService.addAccountToTrack({
         address: normalizedAddress,
         // TODO support other networks
-        network: getEthereumNetwork(),
+        network: this.chainService.ethereumNetwork,
       })
     })
 
@@ -829,25 +841,13 @@ export default class Main extends BaseService<never> {
   }
 
   async connectInternalEthereumProviderService(): Promise<void> {
-    this.enrichmentService.emitter.on(
-      "enrichedEVMTransactionSignatureRequest",
-      async (enrichedEVMTransactionSignatureRequest) => {
-        this.store.dispatch(
-          updateTransactionOptions(enrichedEVMTransactionSignatureRequest)
-        )
-      }
-    )
-
     this.internalEthereumProviderService.emitter.on(
       "transactionSignatureRequest",
       async ({ payload, resolver, rejecter }) => {
         this.store.dispatch(
           clearTransactionState(TransactionConstructionStatus.Pending)
         )
-        this.enrichmentService.enrichTransactionSignature(
-          payload,
-          2 /* TODO desiredDecimals should be configurable */
-        )
+        this.store.dispatch(updateTransactionOptions(payload))
 
         const clear = () => {
           if (HIDE_IMPORT_LEDGER) {
@@ -970,7 +970,7 @@ export default class Main extends BaseService<never> {
 
     this.preferenceService.emitter.on(
       "initializeSelectedAccount",
-      async (dbAddressNetwork: AddressNetwork) => {
+      async (dbAddressNetwork: AddressOnNetwork) => {
         if (dbAddressNetwork) {
           // TBD: naming the normal reducer and async thunks
           // Initialize redux from the db
