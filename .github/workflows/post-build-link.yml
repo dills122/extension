@@ -17,9 +17,9 @@ jobs:
   post-link:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Post artifact link to PR if available
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             const postBuildLink = require("./.github/workflows/builds/post-build-link.js")
